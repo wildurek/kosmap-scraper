@@ -78,6 +78,7 @@ def fetch_autodata(session):
     return results
 
 
+
 def check_changes():
     global previous_state, previous_my_events
 
@@ -86,6 +87,9 @@ def check_changes():
 
     my_events = fetch_my_registered_events(session)
     current = fetch_autodata(session)
+
+    print("MY_EVENTS:", my_events)
+    print("CURRENT AUTOMODUL:", list(current.keys()))
 
     if not previous_state:
         previous_state = current
@@ -128,3 +132,4 @@ if __name__ == "__main__":
         except Exception as e:
             send_notify(f"KOSMAP CHYBA: {str(e)}")
         time.sleep(CHECK_INTERVAL_SECONDS)
+
