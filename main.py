@@ -10,6 +10,7 @@ USERNAME = os.getenv("KOSMAP_USER")
 PASSWORD = os.getenv("KOSMAP_PASS")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC")
 
+MY_NAME = "Vilém Doušek"
 CHECK_INTERVAL_MINUTES = 15
 
 previous_state = {}
@@ -49,7 +50,9 @@ def fetch_autodata():
                 continue
             driver = cols[0].get_text(strip=True)
             seats = cols[2].get_text(strip=True)
-            cars.append((driver, seats))
+
+            passengers = [x.get_text(strip=True) for x in row.find_all("span")]
+            cars.append((driver, passengers, seats))
 
         results[event_name] = cars
 
@@ -58,22 +61,30 @@ def fetch_autodata():
 
 def check_changes():
     global previous_state
-
     current = fetch_autodata()
 
     if not previous_state:
         previous_state = current
+        send_notify("TEST: Kosmap hlídání běží správně.")
         return
 
-    for event in current:
-        if event not in previous_state:
+    for event, cars in current.items():
+        im_in_car = any(
+            MY_NAME == driver or MY_NAME in passengers
+            for driver, passengers, seats in cars
+        )
+        if im_in_car:
             continue
 
-        old = previous_state[event]
-        new = current[event]
+        someone_can_take_me = any(
+            seats != "" and "volné" in seats.lower()
+            for driver, passengers, seats in cars
+        )
+        if not someone_can_take_me:
+            continue
 
-        if old != new:
-            send_notify(f"V akci {event} je nové auto nebo volné místo.")
+        if previous_state.get(event) != cars:
+            send_notify(f"V akci {event} se objevilo auto nebo volné místo!")
 
     previous_state = current
 
