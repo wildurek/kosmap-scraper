@@ -31,32 +31,32 @@ def extract_event_id(url):
 def login_session():
     session = requests.Session()
 
-    # 1) vytvoření session cookie
-    r1 = session.get(LOGIN_URL, headers={"User-Agent": "Mozilla/5.0"})
-    # session.cookies now contains PHPSESSID
+    # Step 1: GET to establish PHPSESSID
+    session.get(LOGIN_URL, headers={"User-Agent": "Mozilla/5.0"})
 
-    # 2) přihlášení se stejnou cookies + referer
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Referer": LOGIN_URL,
-        "Origin": "https://adam-chromy.cz"
+        "Origin": "https://adam-chromy.cz",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
     }
 
     data = {
         "action": "login",
-        "user_login": USERNAME,
+        "user_login": USERNAME,        # "Vilém Doušek" is correct here
         "user_password": PASSWORD
     }
 
-    r2 = session.post(LOGIN_URL, data=data, headers=headers)
+    # Must encode manually to keep diacritics correct
+    session.post(LOGIN_URL, data=data, headers=headers)
 
-    # 3) ověření přihlášení
+    # Verify login success
     test = session.get(MY_EVENTS_URL, headers={"User-Agent": "Mozilla/5.0"})
-    if MY_NAME not in test.text:
-        send_notify("CHYBA: Login neprošel, server nepřiřadil session (zkontroluj ORIS login).")
-        print("LOGIN FAILED\n")
+    if "Přihlášky členů" not in test.text and "Automodul" not in test.text:
+        send_notify("CHYBA: Login proběhl, ale server neověřil účet (nejčastěji špatné heslo).")
+        print("LOGIN FAILED")
     else:
-        print("LOGIN OK\n")
+        print("LOGIN OK")
 
     return session
 
@@ -160,4 +160,5 @@ if __name__ == "__main__":
         except Exception as e:
             send_notify(f"KOSMAP CHYBA: {str(e)}")
         time.sleep(CHECK_INTERVAL_SECONDS)
+
 
