@@ -25,6 +25,9 @@ def send_notify(text):
     )
 
 
+def norm(s):
+    return " ".join(s.split()).strip().lower()
+
 def fetch_my_registered_events(session):
     r = session.get(MY_EVENTS_URL)
     soup = BeautifulSoup(r.text, "lxml")
@@ -35,7 +38,7 @@ def fetch_my_registered_events(session):
         if "treninky-detail" in href:
             event_name = link.get_text(strip=True)
             if event_name:
-                events.add(event_name)
+                events.add(norm(event_name))
 
     return events
 
@@ -66,7 +69,7 @@ def fetch_autodata(session):
 
             cars.append((driver, passengers, seats))
 
-        results[event_name] = cars
+        results[norm(event_name)] = cars
 
     return results
 
@@ -88,7 +91,7 @@ def check_changes():
         return
 
     # detekce nového přihlášení na akci
-    new_events = my_events - previous_my_events
+    new_events = {e for e in my_events if e not in previous_my_events}
     for event in new_events:
         send_notify(f"Přihlásil ses na akci: {event}")
 
@@ -126,3 +129,4 @@ if __name__ == "__main__":
         except Exception as e:
             send_notify(f"KOSMAP CHYBA: {str(e)}")
         time.sleep(CHECK_INTERVAL_MINUTES * 60)
+
