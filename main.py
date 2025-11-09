@@ -31,30 +31,35 @@ def extract_event_id(url):
 def login_session():
     session = requests.Session()
 
-    # STEP 1 → establish cookie
-    session.get(LOGIN_URL)
+    # 1) vytvoření session cookie
+    r1 = session.get(LOGIN_URL, headers={"User-Agent": "Mozilla/5.0"})
+    # session.cookies now contains PHPSESSID
 
-    # STEP 2 → correct form fields + user-agent
-    headers = {"User-Agent": "Mozilla/5.0"}
-    session.post(
-        LOGIN_URL,
-        data={
-            "action": "login",
-            "user_login": USERNAME,       # << correct
-            "user_password": PASSWORD     # << correct
-        },
-        headers=headers
-    )
+    # 2) přihlášení se stejnou cookies + referer
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": LOGIN_URL,
+        "Origin": "https://adam-chromy.cz"
+    }
 
-    # STEP 3 → verify login success
-    check = session.get(MY_EVENTS_URL)
-    if MY_NAME not in check.text:
-        send_notify("CHYBA: Nepovedlo se přihlásit na KosMap (špatný login nebo session).")
-        print("LOGIN FAILED")
+    data = {
+        "action": "login",
+        "user_login": USERNAME,
+        "user_password": PASSWORD
+    }
+
+    r2 = session.post(LOGIN_URL, data=data, headers=headers)
+
+    # 3) ověření přihlášení
+    test = session.get(MY_EVENTS_URL, headers={"User-Agent": "Mozilla/5.0"})
+    if MY_NAME not in test.text:
+        send_notify("CHYBA: Login neprošel, server nepřiřadil session (zkontroluj ORIS login).")
+        print("LOGIN FAILED\n")
     else:
-        print("LOGIN OK")
+        print("LOGIN OK\n")
 
     return session
+
 
 
 def fetch_my_registered_events(session):
@@ -155,3 +160,4 @@ if __name__ == "__main__":
         except Exception as e:
             send_notify(f"KOSMAP CHYBA: {str(e)}")
         time.sleep(CHECK_INTERVAL_SECONDS)
+
