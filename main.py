@@ -128,5 +128,6 @@ if __name__ == "__main__":
             check_changes()
         except Exception as e:
             send_notify(f"KOSMAP CHYBA: {str(e)}")
-        time.sleep(CHECK_INTERVAL_MINUTES * 60)
+        time.sleep(CHECK_INTERVAL_MINUTES) # * 60
+
 
