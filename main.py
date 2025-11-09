@@ -13,17 +13,14 @@ PASSWORD = os.getenv("KOSMAP_PASS")
 NTFY_TOPIC = os.getenv("NTFY_TOPIC")
 
 MY_NAME = "Doušek Vilém"
-CHECK_INTERVAL_SECONDS = 15   # TEST MODE — after debugging change to 300 (5 min)
+CHECK_INTERVAL_SECONDS = 15   # TEST INTERVAL — later change to 300–900
 
 previous_state = {}
 previous_my_events = set()
 
 
 def send_notify(text):
-    requests.post(
-        f"https://ntfy.sh/{NTFY_TOPIC}",
-        data=text.encode("utf-8")
-    )
+    requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=text.encode("utf-8"))
 
 
 def extract_event_id(url):
@@ -34,21 +31,25 @@ def extract_event_id(url):
 def login_session():
     session = requests.Session()
 
-    # 1) First GET → get session cookie
+    # STEP 1 → establish cookie
     session.get(LOGIN_URL)
 
-    # 2) POST login with real User-Agent
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    # STEP 2 → correct form fields + user-agent
+    headers = {"User-Agent": "Mozilla/5.0"}
     session.post(
         LOGIN_URL,
-        data={"uzivatel": USERNAME, "heslo": PASSWORD},
+        data={
+            "action": "login",
+            "user_login": USERNAME,       # << correct
+            "user_password": PASSWORD     # << correct
+        },
         headers=headers
     )
 
-    # 3) Verify login actually worked
-    test = session.get(MY_EVENTS_URL)
-    if MY_NAME not in test.text:
-        send_notify("CHYBA: Nepovedlo se přihlásit na Kosmap.")
+    # STEP 3 → verify login success
+    check = session.get(MY_EVENTS_URL)
+    if MY_NAME not in check.text:
+        send_notify("CHYBA: Nepovedlo se přihlásit na KosMap (špatný login nebo session).")
         print("LOGIN FAILED")
     else:
         print("LOGIN OK")
@@ -67,7 +68,6 @@ def fetch_my_registered_events(session):
             event_id = extract_event_id(href)
             if event_id:
                 events.add(event_id)
-
     return events
 
 
@@ -77,7 +77,6 @@ def fetch_autodata(session):
     tables = soup.find_all("table")
 
     results = {}
-
     for table in tables:
         header = table.find("a")
         if not header:
@@ -116,26 +115,22 @@ def check_changes():
     print("MY_EVENTS:", my_events)
     print("CURRENT_AUTOMODUL:", list(current.keys()))
 
-    # First run
     if not previous_state:
         previous_state = current
         previous_my_events = my_events
         send_notify("TEST: Kosmap hlídání běží správně.")
         return
 
-    # Detect new event registration
     new = my_events - previous_my_events
     for event_id in new:
         send_notify(f"Přihlásil ses na akci (ID={event_id}).")
 
     previous_my_events = my_events
 
-    # Car change detection
     for event_id, cars in current.items():
         if event_id not in my_events:
             continue
 
-        # already in car → ignore
         im_in_car = any(
             MY_NAME == d or MY_NAME in p
             for d, p, s in cars
@@ -143,12 +138,10 @@ def check_changes():
         if im_in_car:
             continue
 
-        # check free seats
         free_exists = any("volné" in s.lower() for d, p, s in cars)
         if not free_exists:
             continue
 
-        # change detected
         if previous_state.get(event_id) != cars:
             send_notify(f"V akci (ID={event_id}) je volné místo nebo nové auto!")
 
