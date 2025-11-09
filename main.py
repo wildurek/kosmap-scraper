@@ -1,9 +1,6 @@
 import time
 import requests
 from bs4 import BeautifulSoup
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
 
 LOGIN_URL = "https://adam-chromy.cz/kosmap/uzivatel/login.php"
@@ -11,25 +8,19 @@ AUTOMODUL_URL = "https://adam-chromy.cz/kosmap/automodul/index.php"
 
 USERNAME = os.getenv("KOSMAP_USER")
 PASSWORD = os.getenv("KOSMAP_PASS")
-
-EMAIL_FROM = os.getenv("EMAIL_FROM")
-EMAIL_TO = os.getenv("EMAIL_TO")
-EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
+NTFY_TOPIC = os.getenv("NTFY_TOPIC")
 
 CHECK_INTERVAL_MINUTES = 15
 
 previous_state = {}
 
-def send_email(subject, text):
-    msg = MIMEMultipart()
-    msg["From"] = EMAIL_FROM
-    msg["To"] = EMAIL_TO
-    msg["Subject"] = subject
-    msg.attach(MIMEText(text, "plain"))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(EMAIL_FROM, EMAIL_APP_PASSWORD)
-        server.send_message(msg)
+def send_notify(text):
+    requests.post(
+        f"https://ntfy.sh/{NTFY_TOPIC}",
+        data=text.encode("utf-8")
+    )
+
 
 def fetch_autodata():
     session = requests.Session()
@@ -48,7 +39,7 @@ def fetch_autodata():
             continue
 
         event_name = rows[0].get_text(strip=True)
-        if not event_name: 
+        if not event_name:
             continue
 
         cars = []
@@ -64,12 +55,12 @@ def fetch_autodata():
 
     return results
 
+
 def check_changes():
     global previous_state
 
     current = fetch_autodata()
 
-    # First run: just record state
     if not previous_state:
         previous_state = current
         return
@@ -82,17 +73,15 @@ def check_changes():
         new = current[event]
 
         if old != new:
-            send_email(
-                f"[KOSMAP] Nové auto nebo místo v akci: {event}",
-                f"V akci {event} se změnil stav aut nebo míst.\nZkontroluj automodul."
-            )
+            send_notify(f"V akci {event} je nové auto nebo volné místo.")
 
     previous_state = current
+
 
 if __name__ == "__main__":
     while True:
         try:
             check_changes()
         except Exception as e:
-            send_email("[KOSMAP] ERROR", str(e))
+            send_notify(f"KOSMAP CHYBA: {str(e)}")
         time.sleep(CHECK_INTERVAL_MINUTES * 60)
